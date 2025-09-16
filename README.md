@@ -2,6 +2,7 @@
 <img width="254.5" height="533" alt="image" src="https://github.com/user-attachments/assets/5644af6d-0484-4888-ab88-91b0be609b28" />
 
 # Weather App Flutter
+
 เอกสารประกอบการสร้างแอปพลิเคชันแสดงผลสภาพอากาศด้วย Flutter
 
 ## สารบัญ
@@ -16,32 +17,32 @@
 
 ### 1. ศึกษาการใช้งาน API
 
-ในโปรเจกต์นี้ เราจะใช้ API จาก [OpenWeatherMap](https://openweathermap.org/api) เพื่อดึงข้อมูลสภาพอากาศ.
+ในโปรเจกต์นี้ เราจะใช้ API จาก [Open-Meteo](https://open-meteo.com/) ซึ่งเป็น API ฟรีและไม่ต้องใช้ Key.
 
 **ขั้นตอน:**
-1.  **สมัครสมาชิกและรับ API Key:** ไปที่เว็บไซต์ OpenWeatherMap และสร้างบัญชีเพื่อรับ API Key ส่วนตัว.
-2.  **ศึกษาเอกสาร API:** อ่านเอกสารเพื่อทำความเข้าใจวิธีการเรียกใช้งาน Endpoint ต่างๆ. สำหรับโปรเจกต์นี้ เราจะใช้ Current Weather Data API.
-    *   **URL ตัวอย่าง:** `https://api.openweathermap.org/data/2.5/weather?q={city name}&appid={API key}&units=metric`
-3.  **วิเคราะห์ข้อมูล JSON ที่ได้รับ:** เมื่อทดลองเรียก API (เช่น ผ่านเบราว์เซอร์หรือ Postman) เราจะได้รับข้อมูลในรูปแบบ JSON.
-
+1.  **ศึกษาเอกสาร API:** ไปที่เว็บไซต์ Open-Meteo และดูเอกสารประกอบ ที่นี่เราจะใช้ Forecast API.
+2.  **ทำความเข้าใจ URL และ Parameters:**
+    *   **URL ตัวอย่าง:** `https://api.open-meteo.com/v1/forecast?latitude=18.7883&longitude=98.9853&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia/Bangkok`
+    *   **Parameters หลัก:**
+        *   `latitude` & `longitude`: พิกัดทางภูมิศาสตร์ของตำแหน่งที่ต้องการ
+        *   `daily`: ข้อมูลรายวันที่ต้องการดึงค่า เช่น `temperature_2m_max` (อุณหภูมิสูงสุด), `temperature_2m_min` (อุณหภูมิต่ำสุด), `precipitation_sum` (ปริมาณน้ำฝนรวม)
+        *   `timezone`: เขตเวลาเพื่อความถูกต้องของข้อมูล
+3.  **วิเคราะห์ข้อมูล JSON ที่ได้รับ:**
     **ตัวอย่าง JSON Response:**
     ```json
     {
-      "weather": [
-        {
-          "main": "Clouds",
-          "description": "overcast clouds"
-        }
-      ],
-      "main": {
-        "temp": 25.3,
-        "feels_like": 25.1,
-        "humidity": 54
-      },
-      "name": "Bangkok"
+      "latitude": 18.79,
+      "longitude": 98.99,
+      "timezone": "Asia/Bangkok",
+      "daily": {
+        "time": ["2024-09-16", "2024-09-17"],
+        "temperature_2m_max": [32.5, 33.0],
+        "temperature_2m_min": [24.1, 24.5],
+        "precipitation_sum": [5.3, 2.1]
+      }
     }
     ```
-    จากข้อมูลนี้ เราจะสนใจดึงค่า `name` (ชื่อเมือง), `main.temp` (อุณหภูมิ), และ `weather[0].main` (สภาพอากาศหลัก).
+    ข้อมูลที่ได้จะเป็นการพยากรณ์ล่วงหน้าหลายวัน ในตัวอย่างนี้เราจะดึงข้อมูลของวันแรกมาใช้งาน.
 
 ---
 
@@ -52,27 +53,28 @@
 **ไฟล์: `lib/models/weather_model.dart`**
 ```dart
 class WeatherModel {
-  final String cityName;
-  final double temperature;
-  final String mainCondition;
+  final double maxTemperature;
+  final double minTemperature;
+  final double precipitationSum;
 
   WeatherModel({
-    required this.cityName,
-    required this.temperature,
-    required this.mainCondition,
+    required this.maxTemperature,
+    required this.minTemperature,
+    required this.precipitationSum,
   });
 
   factory WeatherModel.fromJson(Map<String, dynamic> json) {
+    // API คืนค่าเป็น list ของข้อมูลรายวัน, ในที่นี้เราจะใช้ข้อมูลของวันแรก (index 0)
     return WeatherModel(
-      cityName: json['name'],
-      temperature: json['main']['temp'].toDouble(),
-      mainCondition: json['weather'][0]['main'],
+      maxTemperature: json['daily']['temperature_2m_max'][0].toDouble(),
+      minTemperature: json['daily']['temperature_2m_min'][0].toDouble(),
+      precipitationSum: json['daily']['precipitation_sum'][0].toDouble(),
     );
   }
 }
 ```
-- **`WeatherModel`**: คลาสที่เก็บข้อมูลสภาพอากาศที่จำเป็น
-- **`factory WeatherModel.fromJson`**: เป็น Factory Constructor ที่ทำหน้าที่แปลง `Map<String, dynamic>` (ผลลัพธ์จากการ decode JSON) ให้กลายเป็น `WeatherModel` object.
+- **`WeatherModel`**: คลาสที่เก็บข้อมูลสภาพอากาศที่เราสนใจ.
+- **`factory WeatherModel.fromJson`**: ทำหน้าที่แปลง `Map<String, dynamic>` (ผลลัพธ์จากการ decode JSON) ให้กลายเป็น `WeatherModel` object.
 
 ---
 
@@ -94,7 +96,7 @@ dependencies:
 แล้วรัน `flutter pub get` ใน Terminal.
 
 #### หลักการของ `http`
-ใช้สำหรับสื่อสารกับ Web services. ในที่นี้คือการส่ง `GET` request ไปยัง OpenWeatherMap API เพื่อขอข้อมูลสภาพอากาศ.
+ใช้สำหรับสื่อสารกับ Web services. ในที่นี้คือการส่ง `GET` request ไปยัง Open-Meteo API เพื่อขอข้อมูลสภาพอากาศ.
 
 #### หลักการของ `provider`
 เป็นวิธีที่ง่ายในการจัดการ State ของแอป.
@@ -118,13 +120,11 @@ import 'package:http/http.dart' as http;
 import '../models/weather_model.dart';
 
 class WeatherService {
-  static const BASE_URL = 'http://api.openweathermap.org/data/2.5/weather';
-  final String apiKey;
+  static const BASE_URL = 'https://api.open-meteo.com/v1/forecast';
 
-  WeatherService(this.apiKey);
-
-  Future<WeatherModel> getWeather(String cityName) async {
-    final response = await http.get(Uri.parse('$BASE_URL?q=$cityName&appid=$apiKey&units=metric'));
+  Future<WeatherModel> getWeather(double latitude, double longitude) async {
+    final response = await http.get(Uri.parse(
+        '$BASE_URL?latitude=$latitude&longitude=$longitude&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia%2FBangkok'));
 
     if (response.statusCode == 200) {
       return WeatherModel.fromJson(jsonDecode(response.body));
@@ -154,13 +154,13 @@ class WeatherProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  Future<void> fetchWeather(String cityName) async {
+  Future<void> fetchWeather(double latitude, double longitude) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      _weather = await _weatherService.getWeather(cityName);
+      _weather = await _weatherService.getWeather(latitude, longitude);
     } catch (e) {
       _errorMessage = e.toString();
     } finally {
@@ -176,12 +176,11 @@ class WeatherProvider extends ChangeNotifier {
 
 ### 5. ออกแบบหน้าแอปเพื่อแสดงผลข้อมูล
 
-หน้าแอปจะประกอบด้วย:
-1.  **ชื่อเมือง (City Name)**
-2.  **อุณหภูมิ (Temperature)**
-3.  **สภาพอากาศ (Main Condition)**
-4.  **ช่องสำหรับค้นหาเมือง (TextField)** - (เพิ่มเติม)
-5.  **สถานะ Loading และ Error**
+หน้าแอปจะแสดงข้อมูลพยากรณ์อากาศสำหรับพิกัดที่กำหนด (เช่น เชียงใหม่).
+1.  **อุณหภูมิสูงสุด (Max Temperature)**
+2.  **อุณหภูมิต่ำสุด (Min Temperature)**
+3.  **ปริมาณน้ำฝน (Precipitation)**
+4.  **สถานะ Loading และ Error**
 
 เราจะใช้ `ChangeNotifierProvider` ที่ Widget แม่สุดของแอป (`main.dart`) และใช้ `Consumer<WeatherProvider>` ใน Widget ที่ต้องการแสดงผลข้อมูล.
 
@@ -189,40 +188,47 @@ class WeatherProvider extends ChangeNotifier {
 ```dart
 // ... (ส่วนของ imports และ main())
 
-class WeatherPage extends StatelessWidget {
+class WeatherPage extends StatefulWidget {
+  @override
+  _WeatherPageState createState() => _WeatherPageState();
+}
+
+class _WeatherPageState extends State<WeatherPage> {
+  @override
+  void initState() {
+    super.initState();
+    // เรียก fetchWeather เมื่อหน้าจอถูกสร้างขึ้นครั้งแรก
+    // ใช้พิกัดของเชียงใหม่ตามตัวอย่าง API
+    Provider.of<WeatherProvider>(context, listen: false).fetchWeather(18.7883, 98.9853);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Weather App')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Search Bar (Optional)
-            // ...
-
-            Consumer<WeatherProvider>(
-              builder: (context, provider, child) {
-                if (provider.isLoading) {
-                  return CircularProgressIndicator();
-                }
-                if (provider.errorMessage != null) {
-                  return Text(provider.errorMessage!);
-                }
-                if (provider.weather == null) {
-                  return Text('Search for a city to see the weather.');
-                }
-                return Column(
-                  children: [
-                    Text(provider.weather!.cityName, style: TextStyle(fontSize: 32)),
-                    Text('${provider.weather!.temperature.round()}°C', style: TextStyle(fontSize: 48)),
-                    Text(provider.weather!.mainCondition, style: TextStyle(fontSize: 24)),
-                  ],
-                );
-              },
-            ),
-          ],
+      appBar: AppBar(title: Text('Weather Forecast')),
+      body: Center(
+        child: Consumer<WeatherProvider>(
+          builder: (context, provider, child) {
+            if (provider.isLoading) {
+              return CircularProgressIndicator();
+            }
+            if (provider.errorMessage != null) {
+              return Text(provider.errorMessage!);
+            }
+            if (provider.weather == null) {
+              return Text('No weather data available.');
+            }
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Chiang Mai Forecast', style: TextStyle(fontSize: 32)),
+                SizedBox(height: 20),
+                Text('Max Temp: ${provider.weather!.maxTemperature.round()}°C', style: TextStyle(fontSize: 24)),
+                Text('Min Temp: ${provider.weather!.minTemperature.round()}°C', style: TextStyle(fontSize: 24)),
+                Text('Precipitation: ${provider.weather!.precipitationSum} mm', style: TextStyle(fontSize: 24)),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -237,23 +243,18 @@ class WeatherPage extends StatelessWidget {
 
 #### `main.dart`
 - **`main()`**: จุดเริ่มต้นของแอป. เราจะห่อ `MaterialApp` ด้วย `ChangeNotifierProvider` เพื่อให้ `WeatherProvider` สามารถถูกเรียกใช้ได้จากทุกที่ในแอป.
-- **`WeatherPage`**: หน้าหลักของแอปที่แสดง UI.
-- **`Provider.of<WeatherProvider>(context, listen: false).fetchWeather(...)`**: วิธีการเรียกใช้เมธอดใน Provider. `listen: false` หมายความว่า Widget นี้ไม่ต้อง rebuild เมื่อ `notifyListeners()` ถูกเรียก (เหมาะสำหรับการเรียก action).
+- **`WeatherPage`**: ถูกเปลี่ยนเป็น `StatefulWidget` เพื่อใช้ `initState` ในการดึงข้อมูลสภาพอากาศครั้งแรกเมื่อแอปเริ่มทำงาน.
+- **`Provider.of<WeatherProvider>(context, listen: false).fetchWeather(...)`**: ถูกเรียกใน `initState` เพื่อเริ่มการดึงข้อมูล. `listen: false` เป็นสิ่งจำเป็นเมื่อเรียก Provider ใน `initState`.
 
 #### `weather_model.dart`
-- ตามที่อธิบายในหัวข้อที่ 2, ทำหน้าที่เป็น "พิมพ์เขียว" ของข้อมูล.
+- ถูกปรับเปลี่ยนให้ตรงกับโครงสร้าง JSON ของ Open-Meteo API โดยจะเก็บค่า `maxTemperature`, `minTemperature`, และ `precipitationSum`.
 
 #### `weather_service.dart`
-- แยกส่วนการติดต่อกับ API ออกมาโดยเฉพาะ ทำให้โค้ดสะอาดและง่ายต่อการทดสอบ.
-- จัดการกับการเรียก `http.get` และตรวจสอบ `statusCode` เพื่อให้แน่ใจว่าการเรียกสำเร็จ.
+- `BASE_URL` ถูกเปลี่ยนเป็นของ Open-Meteo.
+- เมธอด `getWeather` รับ `latitude` และ `longitude` แทน `cityName`.
+- ไม่มีการใช้ `apiKey` เนื่องจาก Open-Meteo ไม่ต้องการ.
 
 #### `weather_provider.dart`
-- เป็นหัวใจของ State Management.
-- เก็บสถานะต่างๆ (`_weather`, `_isLoading`, `_errorMessage`).
-- มีเมธอด `fetchWeather` ที่เป็น Business Logic หลัก: จัดการการโหลด, ดักจับข้อผิดพลาด, และอัปเดต State.
+- เมธอด `fetchWeather` ถูกปรับให้รับ `latitude` และ `longitude` เพื่อส่งต่อไปยัง `WeatherService`.
 
 ---
-
-
-
-
